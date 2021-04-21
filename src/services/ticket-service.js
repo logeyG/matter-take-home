@@ -6,7 +6,7 @@ class TicketService {
 
         return true;
     }
-
+    
     validateCanSetParent(childId, parentId, children) {
         if(children.map(t => t.id).some(id => id == parentId)) {
             throw Error(`Cannot set parent as this would create a circular reference, given child id=${childId} is a parent of ticket id=${parentId}`);

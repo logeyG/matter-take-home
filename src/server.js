@@ -79,6 +79,7 @@ const resolvers = {
       });
     },
     updateTicket: async (root, args, context) => {
+      // I prefer this pattern to an update followed by a find (update does not return an object)
       const ticket = await models.Ticket.findByPk(args.id);
       ticket.title = args.title;
       await ticket.save();
@@ -123,7 +124,6 @@ const resolvers = {
         }
       });
 
-      // for brevity, this will only work for one level down
       ticketService.validateCanSetParent(args.childId, args.parentId, children);
   
       await models.Ticket.update({ parentId: args.parentId }, {
