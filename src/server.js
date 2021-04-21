@@ -1,8 +1,10 @@
 import express from "express";
 import { ApolloServer, gql } from "apollo-server-express";
 import { models } from "./db";
+import TicketService from "./services/ticket-service"
 
 const PORT = 4001;
+const ticketService = new TicketService();
 
 const typeDefs = gql`
   type Ticket {
@@ -44,11 +46,6 @@ const typeDefs = gql`
   }
 `;
 
-/**
- * TODO: Your task is implementing the resolvers. Go through the README first.
- * TODO: Your resolvers below will need to implement the typedefs given above.
- */
-
 const resolvers = {
   Query: {
     /**
@@ -60,10 +57,93 @@ const resolvers = {
           parentId: null
         }
       });
+    },
+    ticket: async (root, args, context) => {
+      return models.Ticket.findByPk(args.id);
     }
   },
-  Ticket: {},
-  Mutation: {}
+  Ticket: {
+    children: async (root, args, context) => {
+      return models.Ticket.findAll({
+        where: {
+          parentId: root.id
+        }
+      });
+    }
+  },
+  Mutation: {
+    createTicket: async (root, args, context) => {
+      return models.Ticket.create({
+        title: args.title,
+        isCompleted: args.isCompleted ? true : false
+      });
+    },
+    updateTicket: async (root, args, context) => {
+      const ticket = await models.Ticket.findByPk(args.id);
+      ticket.title = args.title;
+      await ticket.save();
+
+      return ticket;
+    },
+    toggleTicket: async (root, args, context) => {
+      const ticket = await models.Ticket.findByPk(args.id);
+      ticket.isCompleted = args.isCompleted;
+      await ticket.save();
+
+      return ticket;
+    },
+    removeTicket: async (root, args, context) => {
+      const children = await models.Ticket.findAll({
+        where: {
+          parentId: args.id
+        }
+      });
+
+      ticketService.validateCanDeleteTicket(args.id, children);
+
+      return models.Ticket.destroy({
+        where: {
+          id: args.id
+        }
+      });
+    },
+    addChildrenToTicket: async (root, args, context) => {
+      await models.Ticket.update({ parentId: args.parentId }, {
+        where: {
+          id: args.childrenIds
+        }
+      });
+
+      return models.Ticket.findByPk(args.parentId);
+    },
+    setParentOfTicket: async (root, args, context) => {
+      const children = await models.Ticket.findAll({
+        where: {
+          parentId: args.childId
+        }
+      });
+
+      // for brevity, this will only work for one level down
+      ticketService.validateCanSetParent(args.childId, args.parentId, children);
+  
+      await models.Ticket.update({ parentId: args.parentId }, {
+        where: {
+          id: args.childId
+        }
+      });
+
+      return models.Ticket.findByPk(args.parentId);
+    },
+    removeParentFromTicket: async (root, args, context) => {  
+      await models.Ticket.update({ parentId: null }, {
+        where: {
+          id: args.id
+        }
+      });
+
+      return models.Ticket.findByPk(args.id);
+    }
+  }
 };
 
 const server = new ApolloServer({
